@@ -1,39 +1,118 @@
 
+// Transmiter
+
+#include <RF24Network.h>
 #include <SPI.h>
 #include <nRF24L01.h>
 #include <RF24.h>
 
 RF24 radio(7, 8); // CE, CSN
+RF24Network network(radio);   // include radio in network
 
-const byte address[6] = "00001";
+const uint16_t this_unit = 00;
+const uint16_t sensor_unit = 01; // we can include another sensor_unit here
 
-const int przyciskPin = 6; 
+// button to reset alarm state and send information about reset to others unit
+const int resetButtonPin = 3; 
+int stateOfResetButton = 0;
 
-int stanPrzycisku = 0; 
+// led pins
+int greenLed = 4;
+int yellowLed = 5;
+int redLed = 6;
 
-int payload = 0;
+int speaker = 2;
+
+// logic states
+bool noSignalState = false; // lost signal with some sensor
+bool alarmState = false; // found some gas
 
 void setup() {
+  // serial monitor start
   Serial.begin(9600);
+
+  // start radio network
+  SPI.begin();
   radio.begin();
-  radio.openWritingPipe(address);
-  radio.setPALevel(RF24_PA_MIN);
-  radio.stopListening();
-  pinMode(przyciskPin, INPUT_PULLUP);
+
+  // communication channel same for every unit, address of this specific unit
+  network.begin(90, this_unit);
+  radio.setDataRate(RF24_2MBPS);
+
+  // set pins
+
+  pinMode(resetButtonPin, INPUT_PULLUP);
+
+  pinMode(greenLed, OUTPUT);
+  pinMode(yellowLed, OUTPUT);
+  pinMode(redLed, OUTPUT);
+
+  pinMode(speaker, OUTPUT);
+
+  digitalWrite(greenLed, HIGH); // greenLed is set on start
 }
 
 void loop() {
-  stanPrzycisku = digitalRead(przyciskPin);
 
-  if (stanPrzycisku == LOW) {
-    payload = 1; 
-    radio.write(&payload, sizeof(int));
-  } else {
-    payload = 0;
-    radio.write(&payload, sizeof(int));
+  stateCheck();
+
+  network.update();
+  
+  // RECEIVING
+
+  while( network.available() ){
+    RF24NetworkHeader header;
+    
+    bool incomingData; 
+    network.read(header, &incomingData, sizeof(incomingData));
+    
+    // read boolean value from sensor about alarm state
+
+    if (incomingData){
+      alarmState = true;
+    }
   }
-  delay(5);
+
+  if ( digitalRead(resetButtonPin) ) { // disable states if reset button is pressed
+    bool noSignalState = false; 
+    bool alarmState = false;
+
+    // TODO: need to send some information to reset alarm on sensor
+  }
+    
 }
+
+
+void stateCheck(){
+
+  if (alarmState) {
+
+    digitalWrite(greenLed,LOW);    
+    digitalWrite(yellowLed,LOW);
+    digitalWrite(redLed, HIGH);
+
+    tone(speaker, 3000);
+    
+  } else if(noSignalState){ 
+
+    digitalWrite(greenLed, LOW);
+    digitalWrite(yellowLed, HIGH);
+    digitalWrite(redLed, LOW);
+
+    noTone(speaker);
+
+  } else {
+
+    digitalWrite(greenLed, HIGH);
+    digitalWrite(yellowLed, LOW);
+    digitalWrite(redLed, LOW);
+
+    noTone(speaker);
+  }
+}
+
+
+
 
 
 
