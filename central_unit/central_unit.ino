@@ -8,8 +8,8 @@
 RF24 radio(7, 8); // CE, CSN
 RF24Network network(radio);   // include radio in network
 
-const uint16_t this_unit = 0;
-const uint16_t sensorsAddressTab[1] = {1}; // we can include another sensor_unit here
+const uint16_t this_unit = 00;
+const uint16_t sensorsAddressTab[1] = {01}; // we can include another sensor_unit here
 
 // button to reset alarm state and send information about reset to others unit
 const int resetButtonPin = 3; 
@@ -17,6 +17,7 @@ int buttonCounter = 0;
 
 int speaker = 2;
 
+int payload;
 
 // logic state table
 bool stateTab[3] = {false, false, false};
@@ -24,7 +25,6 @@ bool stateTab[3] = {false, false, false};
 // led pins (4 - green, 5 - yellow, 6 - red)
 int ledPinsTab[3] = {4,5,6};
 
-int payload;
 
 
 void setup() {
@@ -103,7 +103,7 @@ void loop() {
     buttonCounter = 0;
   }
 
-  delay(100);
+  
   
 } 
 
