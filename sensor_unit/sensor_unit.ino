@@ -1,18 +1,16 @@
 
 // Receiver Code
 
-#include <RF24Network.h>
 #include <SPI.h>
 #include <nRF24L01.h>
 #include <RF24.h>
 
 RF24 radio(7, 8); // CE, CSN
-RF24Network network(radio);  
 
-const uint16_t this_unit = 01;   // Address of our node in Octal format ( 04,031, etc)
-const uint16_t central_unit = 00; 
+const byte own_address = "00002";   // Address of our node in Octal format ( 04,031, etc)
+const byte central_address = "00001"; 
 
-#define Threshold 700 // upper limit of sensor when it can find gas
+#define Threshold 450 // upper limit of sensor when it can find gas
 
 #define gasSensor 5
 
@@ -29,18 +27,23 @@ bool stateTab[3] = {false, false, false};
 // led pins (2 - green, 3 - yellow, 4 - red)
 int ledPinsTab[3] = {2,3,4};
 
+const byte addresses[][6] = {"00001", "00002"};
+
 
 void setup() {
   // start serial monitor
   Serial.begin(9600);
   
   // start radio
-  SPI.begin();
   radio.begin();
 
   // communication channel same for every unit, address of this specific unit
-  network.begin(90, this_unit);
-  radio.setDataRate(RF24_2MBPS);
+  // radio.openWritingPipe(central_address); // 00001
+  // radio.openReadingPipe(1, own_address);  // 00002
+  radio.openWritingPipe(addresses[0]); // 00001
+  radio.openReadingPipe(1, addresses[1]); // 00002
+  
+  radio.setPALevel(RF24_PA_MIN);
 
   // set pins
   for(int i=0; i < sizeof(ledPinsTab)/sizeof(int); i++){ // define led pins from table as a output
@@ -48,45 +51,53 @@ void setup() {
   }
 
   pinMode(speaker, OUTPUT);
+
+  changeStateTo(1);
 }
 
 void loop() {
 
-  // check gas sensor
-  // if (isGasToHigh()){
-  //   changeStateTo(3); // set alarm state
-  // }
 
-  network.update();
+  radio.startListening();
 
   // RECEIVING
 
-  while ( network.available() ){
-    RF24NetworkHeader header;
+  if ( radio.available()){
     
     int incomingPayload; 
-    network.read(header, &incomingPayload, sizeof(incomingPayload));
+    radio.read(&incomingPayload, sizeof(incomingPayload));
     
-    if(header.from_node == central_unit){
-      Serial.println("Get message from central_unit");
-      switch(incomingPayload){
-        case 1:               // reset to good message
-          changeStateTo(1);   // set good state
+    Serial.println("Get message from central_unit: ");
+    Serial.print(incomingPayload);
+    switch(incomingPayload){
+      case 1:               // reset to good message
+        changeStateTo(1);   // set good state
           break;
-        case 2:               // alarm message
-          changeStateTo(3);   // set alarm state
-      }
+      case 2:               // alarm message
+        changeStateTo(3);   // set alarm state
     }
+  } delay(60);
+  
+
+  radio.stopListening();
+
+  //check gas sensor
+  if (isGasToHigh()){
+    changeStateTo(3); // set alarm state
   }
 
   // TRANSMITING
 
-  RF24NetworkHeader header(central_unit);
-  bool result = network.write(header, &payload, sizeof(payload));
+  
+  bool result = radio.write(&payload, sizeof(payload));
     
   if(!result){  // message dont reach address and alarm isn't set
     Serial.println("Failed to send message");
     changeStateTo(2);           // change to no signal state
+  } else {
+      if (!stateTab[2]){      // if communitation is good and alarm isnt set.
+        changeStateTo(1);     // Set good state
+      }
   }
 
   

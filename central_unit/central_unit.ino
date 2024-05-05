@@ -1,19 +1,19 @@
 // Transmiter
 
-#include <RF24Network.h>
+
 #include <SPI.h>
 #include <nRF24L01.h>
 #include <RF24.h>
 
 RF24 radio(7, 8); // CE, CSN
-RF24Network network(radio);   // include radio in network
 
-const uint16_t this_unit = 00;
-const uint16_t sensorsAddressTab[1] = {01}; // we can include another sensor_unit here
+const byte ownAddress = "00001";
+const byte sensorsAddressTab[1] = {"00002"}; // we can include another sensor_unit here
 
 // button to reset alarm state and send information about reset to others unit
 const int resetButtonPin = 3; 
 int buttonCounter = 0;
+bool startReset = false;
 
 int speaker = 2;
 
@@ -25,19 +25,20 @@ bool stateTab[3] = {false, false, false};
 // led pins (4 - green, 5 - yellow, 6 - red)
 int ledPinsTab[3] = {4,5,6};
 
-
+const byte addresses[][6] = {"00001", "00002"};
 
 void setup() {
   // serial monitor start
   Serial.begin(9600);
 
   // start radio network
-  SPI.begin();
   radio.begin();
 
   // communication channel same for every unit, address of this specific unit
-  network.begin(90, this_unit);
-  radio.setDataRate(RF24_2MBPS);
+  radio.openWritingPipe(addresses[1]); // 00002
+  radio.openReadingPipe(1, addresses[0]); // 00001
+  // radio.openReadingPipe(1, ownAddress); // 00001
+  radio.setPALevel(RF24_PA_MIN);
 
   // set pins
 
@@ -54,15 +55,27 @@ void setup() {
 
 void loop() {
 
-  network.update();
+  int buttonState = digitalRead(resetButtonPin);
+
+  if (buttonState == LOW){ // back to good state if button is clicked
+    if (buttonCounter>5){
+      Serial.println("Button clicked!");
+      changeStateTo(1);
+      startReset = true;
+    } else {
+      buttonCounter++;
+    }
+  } else {
+    buttonCounter = 0;
+    startReset = false;
+  }
   
   // RECEIVING
-
-  while( network.available() ){
-    RF24NetworkHeader header;
+  radio.startListening();
+  if( radio.available()){
     
     int incomingPayload; 
-    network.read(header, &incomingPayload, sizeof(incomingPayload));
+    radio.read(&incomingPayload, sizeof(incomingPayload));
     
     /* 
     Check incoming massage 
@@ -72,38 +85,35 @@ void loop() {
     */
 
     if (incomingPayload == 2){ // if any sensor send alarm we set alarm on central unit
-      changeStateTo(3);   
+      if(!startReset){
+        changeStateTo(3);
+      }
     }
+    
+  } delay(60);
 
-  }
+  radio.stopListening();
     
   // TRANSMITING
   
   // send payload to other sensor units
-  for(uint16_t address : sensorsAddressTab){
-    RF24NetworkHeader header(address);
-    bool result = network.write(header, &payload, sizeof(payload));
+  // for(byte address : sensorsAddressTab){
+  //   radio.openWritingPipe(address);
+    bool result = radio.write(&payload, sizeof(payload));
     
     if(!result){  // message dont reach address and alarm isn't set
+      Serial.println("Failed to send message");
       changeStateTo(2);           // change to no signal state
-    }
-  }
-
-
-  int buttonState = digitalRead(resetButtonPin);
-
-  if (buttonState == LOW){ // back to good state if button is clicked
-    if (buttonCounter>3){
-      Serial.println("Button clicked!");
-      changeStateTo(1);
     } else {
-      buttonCounter++;
+      Serial.println("Success send");
+      if (!stateTab[2]){      // if communitation is good and alarm isnt set.
+        changeStateTo(1);     // Set good state
+      }
     }
-  } else {
-    buttonCounter = 0;
-  }
+  // }
 
-  
+
+
   
 } 
 
