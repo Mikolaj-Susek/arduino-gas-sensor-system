@@ -19,6 +19,7 @@ const uint16_t central_unit = 00;
 int greenLed = 2;
 int yellowLed = 3;
 int redLed = 4;
+
 int speaker = 5;
 
 float sensorValue;  
