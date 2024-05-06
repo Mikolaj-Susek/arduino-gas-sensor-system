@@ -10,7 +10,7 @@ RF24 radio(7, 8); // CE, CSN
 const byte own_address = "00002";   // Address of our node in Octal format ( 04,031, etc)
 const byte central_address = "00001"; 
 
-#define Threshold 450 // upper limit of sensor when it can find gas
+#define Threshold 500 // upper limit of sensor when it can find gas
 
 #define gasSensor 5
 
@@ -29,6 +29,9 @@ int ledPinsTab[3] = {2,3,4};
 
 const byte addresses[][6] = {"00001", "00002"};
 
+// package handling
+int failedPackageCounter = 0;
+int failedPackageLimit = 3;
 
 void setup() {
   // start serial monitor
@@ -92,12 +95,25 @@ void loop() {
   bool result = radio.write(&payload, sizeof(payload));
     
   if(!result){  // message dont reach address and alarm isn't set
-    Serial.println("Failed to send message");
-    changeStateTo(2);           // change to no signal state
+    if ( failedPackageCounter > failedPackageLimit ){
+    
+      Serial.println("Failed to send message");
+    
+      changeStateTo(2);           // change to no signal state
+    
+    } else {
+    
+      failedPackageCounter++;
+    
+    }
   } else {
-      if (!stateTab[2]){      // if communitation is good and alarm isnt set.
-        changeStateTo(1);     // Set good state
-      }
+    Serial.println("Success send");
+    
+    failedPackageCounter=0;
+    
+    if (!stateTab[2]){      // if communitation is good and alarm isnt set.
+      changeStateTo(1);     // Set good state
+    }
   }
 
   
