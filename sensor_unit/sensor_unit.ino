@@ -10,7 +10,7 @@ RF24 radio(7, 8); // CE, CSN
 const byte own_address = "00002";   // Address of our node in Octal format ( 04,031, etc)
 const byte central_address = "00001"; 
 
-#define Threshold 500 // upper limit of sensor when it can find gas
+#define Threshold 450 // upper limit of sensor when it can find gas
 
 #define gasSensor 5
 
@@ -70,8 +70,6 @@ void loop() {
     int incomingPayload; 
     radio.read(&incomingPayload, sizeof(incomingPayload));
     
-    Serial.println("Get message from central_unit: ");
-    Serial.print(incomingPayload);
     switch(incomingPayload){
       case 1:               // reset to good message
         changeStateTo(1);   // set good state
@@ -97,7 +95,7 @@ void loop() {
   if(!result){  // message dont reach address and alarm isn't set
     if ( failedPackageCounter > failedPackageLimit ){
     
-      Serial.println("Failed to send message");
+      Serial.print("|\tFailed to send message");
     
       changeStateTo(2);           // change to no signal state
     
@@ -107,7 +105,7 @@ void loop() {
     
     }
   } else {
-    Serial.println("Success send");
+    Serial.print("| Success send\n");
     
     failedPackageCounter=0;
     
@@ -123,14 +121,15 @@ void loop() {
 bool isGasToHigh(){
   sensorValue = analogRead(gasSensor); // read analog input pin 0
   
-  Serial.println("Sensor Value: ");
-  Serial.println(sensorValue);
+  Serial.print("Sensor Value: ");
+  Serial.print(sensorValue);
 
   if(sensorValue > Threshold)
   {
-    Serial.print(" | Smoke detected!");
+    Serial.print("|\tSmoke detected!");
     return true;
   }
+  Serial.print("|\tNo smoke");
   return false;
   
 }
@@ -166,7 +165,7 @@ void changeStateTo(int stateNumber){
         stateTab[0] = true;
         digitalWrite(ledPinsTab[0], HIGH);
         payload = 1;
-        Serial.println("Change to good state");         
+        Serial.print("|\tChange to good state");         
       }
       break;
 
@@ -176,7 +175,7 @@ void changeStateTo(int stateNumber){
         stateTab[1] = true;
         digitalWrite(ledPinsTab[1], HIGH);
         payload = 1;
-        Serial.println("Change to no signal");
+        Serial.print("|\tChange to no signal");
       }
       break;
 
@@ -187,7 +186,7 @@ void changeStateTo(int stateNumber){
         digitalWrite(ledPinsTab[2], HIGH);
         tone(speaker, 3000);
         payload = 2;
-        Serial.println("Change to alarm");
+        Serial.print("|\tChange to alarm");
       }
       break;
   }
